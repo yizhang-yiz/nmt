@@ -1,5 +1,5 @@
-Package: nmutr
-Title: NONMEM Frontend And Utilities
+Package: nmt
+Title: NONMEM tools
 Version: 0.0.0.9000
 Authors@R:
     person("Yi", "Zhang", , "yi.zhang6@iconplc.com", role = c("aut", "cre"))
