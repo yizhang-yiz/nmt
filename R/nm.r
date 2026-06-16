@@ -1,11 +1,29 @@
-nm <- function(model) {
+#' Run the model either from file or "nmodel" object
+#'
+#' @param model model control stream file or "nmodel" object
+#' @param cmake_stdout Whether to output cmake build info to screen
+#' @return nmrun object
+#' @export
+nm <- function(model, cmake_stdout=FALSE) {
     if (is.character(model)) {
-        nm_file(model)
+        nm_file(model, cmake_stdout)
     } else if (inherits(model, "nmodel")) {
+        write_nm_csv(model$data, "data.csv")
+        write(model$control, "./model.ctl")
+        nm_file("./model.ctl", cmake_stdout)
     }
 }
 
-nm_file <- function(raw_model_path) {
+#' Run NONMEM model specified in a file
+#'
+#' The function runs a NONMEM model given in a control stream file. It requires that
+#' the data file is located in the same path as the control stream.
+#'
+#' @param raw_model_path model control stream file path
+#' @param cmake_stdout Whether to output cmake build info to screen
+#' @return nmrun object
+#' @export
+nm_file <- function(raw_model_path, cmake_stdout) {
     old <- getwd()
     on.exit(setwd(old), add = TRUE)
 
@@ -13,11 +31,12 @@ nm_file <- function(raw_model_path) {
     f0 <- tools::file_path_sans_ext(f)
     build_dir <- tempfile(pattern = paste0("cmake_", f0, "_"), tmpdir = tempdir())
     dir.create(build_dir, showWarnings = FALSE, recursive = TRUE)
+    model_file_path <- normalizePath(raw_model_path)
     model_dir <- normalizePath(dirname(raw_model_path))
+    tables <- tablefile(raw_model_path)
     files <- c(file.path(model_dir, f),
                file.path(model_dir, datafile(raw_model_path)),
-               file.path(model_dir, inclfile(raw_model_path)))
-    file.copy(from = files, , to = build_dir, overwrite = TRUE)
+               file.path(model_dir, incfile(raw_model_path)))
 
     if (is.null(.nm_env$nm_path)) {
         stop("Use 'set_nm_path()' to set NONMEM path.")
@@ -28,10 +47,22 @@ nm_file <- function(raw_model_path) {
     setwd(build_dir)
     res <- sys::exec_wait("cmake",
                           args = c(.nm_env$nm_path, "-B", ".",
-                                   paste0("-Dmodel=", file.path(f)),
+                                   paste0("-Dmodel=", model_file_path),
                                    "-GNinja", .nm_env$cmake_config))
-    res <- sys::exec_wait("cmake",
-                          args = c("--build", ".", .nm_env$cmake_build))
+    if (res != 0) stop(sprintf("cmake config failed with exit code %d", res))
+
+    if (cmake_stdout) {
+        res <- sys::exec_wait("cmake",
+                              args = c("--build", ".", .nm_env$cmake_build))
+    } else {
+        res <- sys::exec_wait("cmake",
+                              args = c("--build", ".", .nm_env$cmake_build), std_out=NULL)
+    }
+
+    if (res != 0) stop(sprintf("cmake build failed with exit code %d", res))
+
+    res <- sys::exec_wait("cmake", args=c("--install", "."))
+    if (res != 0) stop(sprintf("cmake install failed with exit code %d", res))
 
     if (.Platform$OS.type == "windows") {
         mod <- paste0(f0, ".exe")
@@ -39,14 +70,58 @@ nm_file <- function(raw_model_path) {
         mod <- file.path(".", f0)
     }
 
-    res <- sys::exec_wait(cmd=mod, args = c(file.path(f), "output", paste0("-licfile=", .nm_env$nm_lic)))
+    setwd(model_dir)
+    res <- sys::exec_wait(cmd=mod, args = c(file.path(f), paste0("-licfile=", .nm_env$nm_lic)))
 
     structure(list(nm=.nm_env$nm_path,
+                   file_stem=f0,
                    files=files,
                    model=paste(readLines(file.path(f), warn = FALSE), collapse="\n"),
-                   result_path=build_dir,
-                   cpu=as.numeric(readLines(file.path(paste0(f0, ".cpu")), warn = FALSE))),
+                   tables=tables,
+                   result_path=model_dir,
+                   est=est(file.path(fit$result_path, paste0(fit$file_stem, ".ext"))),
+                   cov=res_read_table(file.path(fit$result_path, paste0(fit$file_stem, ".cov"))),
+                   coi=res_read_table(file.path(fit$result_path, paste0(fit$file_stem, ".coi"))),
+                   cor=res_read_table(file.path(fit$result_path, paste0(fit$file_stem, ".cor")))),
                    class = "nmrun")
+}
+
+res_read_table <- function(file) {
+    df <- read.table(file, header=TRUE, skip=1)
+    df <- df[,2:ncol(df)]
+    rownames(df) <- colnames(df)
+    return(df)
+}
+
+#' read .ext file from nmrun object.
+#' @description Raw output from the ".ext" file
+#'
+#' @export
+ext <- function(fit, summary=FALSE) {
+    df <- read.table(paste0(tools::file_path_sans_ext(fit$files[1]), ".ext"), header=TRUE, skip=1)
+    if(!summary) {
+        df <- df[df$ITERATION>=0, ]
+    }
+    df
+}
+
+#' Retrive final estimates from the .ext file from nmrun object
+#'
+#' @export
+est <- function(file) {
+    df <- read.table(file, header=TRUE, skip=1)
+    df <- df[df$ITERATION>=0, ]
+    df <- tail(df, 1)
+    df$ITERATION <- NULL
+    df
+}
+
+#' read .phi file from nmrun object.
+#' @description Raw individual estimate from the ".phi" file
+#'
+#' @export
+phi <- function(fit, summary=FALSE) {
+    read.table(paste0(tools::file_path_sans_ext(fit$files[1]), ".phi"), header=TRUE, skip=1)
 }
 
 nm_save <- function(fit, to) {
@@ -54,7 +129,7 @@ nm_save <- function(fit, to) {
         f0 <- tools::file_path_sans_ext(basename(fit$files[1]))
         if (!dir.exists(to)) dir.create(to, recursive = TRUE)
         f <- list.files(fit$result_path, full.names=TRUE)
-        f <- f[!grepl("\\.cmake$|\\.bak$|\\.a$|build\\.ninja|modules$|fort\\.[0-9]+$|CMake", f)]
+        f <- f[!grepl("\\.cmake$|\\.tmp$|\\.trash$|\\.bak$|\\.a$|build\\.ninja|modules$|fort\\.[0-9]+$|CMake", f)]
         f <- f[!grepl(paste0(f0,"$"), f)]
         f <- f[!grepl(paste0(f0,".exe$"), f)]
         print("x")

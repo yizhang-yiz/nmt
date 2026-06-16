@@ -1,11 +1,11 @@
 Package: nmt
-Title: NONMEM tools
+Title: Lightweight Interface for NONMEM
 Version: 0.0.0.9000
 Authors@R:
     person("Yi", "Zhang", , "yi.zhang6@iconplc.com", role = c("aut", "cre"))
-Description: What the package does (one paragraph).
+Description: Lightweight interface for NONMEM in model setup, execution, and result retrieval.
 License: MIT + file LICENSE
 Encoding: UTF-8
 Language: es
 Roxygen: list(markdown = TRUE)
-RoxygenNote: 7.3.3
+Config/roxygen2/version: 8.0.0

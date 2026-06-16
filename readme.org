@@ -1,0 +1,209 @@
+#+TITLE: nmt: lightweight R interface for NONMEM
+
+~nmt~ is intended for
+- modeling workflow entirely in R;
+- a sensible set of defaults for most modeling practices.
+
+It works in two modes:
+- compile & run an existing control stream file;
+- construct a model in R, then run it.
+
+There are only three essential functions
+- ~set_nm~: set NONMEM path & license;
+- ~nm_model~: construct a model (optional, for model building in R);
+- ~nm~: build & run a model.
+
+* Installation & setup
+#+begin_src r
+remotes::install_github("yizhang-yiz/nmt")
+#+end_src
+
+The package relies on the new NONMEM releases that utilize ~cmake~ &
+~ninja~ toolchain. User needs to use these releases
+and ensure that ~cmake~ & ~ninja~ are available in PATH.
+
+Use ~nmt::set_nm~ to set up NONMEM path and license path.
+#+begin_src r
+  nmt::set_nm("path/to/nonmem", "path/to/nonmem.lic")
+#+end_src
+
+* Run a control stream
+In this mode ~nmt~ is a thin wrappr of the command line process.
+#+begin_src r
+  fit <- nmt::nm("path/to/nonmem/model.ctl")
+#+end_src
+
+It requires that the data file in the ~$DATA~ block is in the
+same path as the control stream, so that the block does not need to
+specify path:
+#+begin_src perl
+$DATA data_file.csv ...
+#+end_src
+
+The output files will be placed in the same path as the control
+stream.
+
+* Construct a model in R
+In this mode, we use ~nmt::nm_model()~ for model building:
+#+begin_src r
+  model <- nmt::nm_model(data, code, tables)
+#+end_src
+The ~model~ variable above is of class ~nmodel~. It contains a control stream based on the
+information provided. Specifically, argument ~data~ is a ~data.frame~ object that conforms with NONMEM [[https://nmusers.github.io/docs/reference-manual/data/][data
+file requirement]]. For example,
+#+begin_src r
+> dplyr::glimpse(data)
+Rows: 150
+Columns: 8
+$ ID   <int> 1, 1, 1, 1, 1, 2, 2, 2, 2, 2, 3, 3, 3, 3, 3, 4, 4, 4, 4, 4, 5, 5, 5, 5, 5, 6, 6, 6, 6, 6, 7, 7, 7, 7, 7, 8, 8, …
+$ TIME <int> 0, 1, 4, 10, 24, 0, 1, 4, 10, 24, 0, 1, 4, 10, 24, 0, 1, 4, 10, 24, 0, 1, 4, 10, 24, 0, 1, 4, 10, 24, 0, 1, 4, …
+$ DV   <dbl> 0.000000, 1.675380, 2.792830, 0.583263, 0.146255, 0.000000, 1.328640, 3.891340, 3.274510, 1.174900, 0.000000, 0…
+$ AMT  <int> 500, 0, 0, 0, 0, 500, 0, 0, 0, 0, 500, 0, 0, 0, 0, 500, 0, 0, 0, 0, 500, 0, 0, 0, 0, 500, 0, 0, 0, 0, 500, 0, 0…
+$ WT   <dbl> 58.4, 58.4, 58.4, 58.4, 58.4, 79.3, 79.3, 79.3, 79.3, 79.3, 88.3, 88.3, 88.3, 88.3, 88.3, 69.9, 69.9, 69.9, 69.…
+$ AGE  <int> 51, 51, 51, 51, 51, 53, 53, 53, 53, 53, 53, 53, 53, 53, 53, 25, 25, 25, 25, 25, 51, 51, 51, 51, 51, 58, 58, 58,…
+$ CRCL <dbl> 4.49, 4.49, 4.49, 4.49, 4.49, 5.05, 5.05, 5.05, 5.05, 5.05, 6.55, 6.55, 6.55, 6.55, 6.55, 5.96, 5.96, 5.96, 5.9…
+$ SMK  <int> 1, 1, 1, 1, 1, 0, 0, 0, 0, 0, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1, 1, 1, 1, 1, 1, 1, …
+#+end_src
+
+The ~code~ argument is character vector for the control
+stream, except the ~$PROB~, ~$INPUT~, ~$DATA~, and ~$TABLE~ blocks. For
+example,
+#+begin_src r
+code <- "
+$SUBROUTINES ADVAN2 TRANS2
+$PK
+  CL=THETA(1)*EXP(ETA(1))
+  TVV=THETA(2)
+  V=TVV*EXP(ETA(2))
+  TVKA=THETA(3)
+  KA=TVKA*EXP(ETA(3))
+  S2=V
+$ERROR
+   DEL=0
+   IF(F.EQ.0) DEL=1
+   W1=1
+   W2=F
+   IPRE=F
+   IRES=DV-IPRE
+   IWRES=IRES/(W1+W2)
+   Y=F + W1*ERR(1) + W2*ERR(2)
+$THETA
+  (0, 10)  ;[CL]
+  (0, 100) ;[V]
+  (0, 0.5) ;[KA]
+$OMEGA
+  0.04 ;[P]
+  0.04 ;[P]
+  0.04 ;[P]
+$SIGMA
+  0.02;[P]
+  0.2 ;[A]
+$EST METHOD=1 INTERACTION MAXEVAL=9999 NOABORT
+$COV
+"
+#+end_src
+
+The ~tables~ argument (default ~NULL~) is a list of variable name arrays for ~$TABLE~
+output. For example, using
+#+begin_src r
+  tables <- list(c("DV", "TIME", "IPRE"), c("CL", "V", "KA", "WT", "AGE", "CRCL", "SMK"))
+#+end_src
+will produce
+#+begin_src perl
+$TABLE DV TIME IPRE ONEHEADER file=table1.tab
+$TABLE CPRED CRES CWRES ONEHEADER file=table2.tab
+#+end_src
+The tables will be written to file "tablex.tab", with "x" enumerated
+from 1.
+
+Additionally, ~nm_model~ automatically adds a ~$TABLE~ for
+diagnostics. The items in that table are those in ~$INPUT~ plus
+common diagnostic metrics, and the table is saved in file
+"diagnostics.tab". In the above example, the line is
+#+begin_src perl
+$TABLE ID TIME DV AMT WT AGE CRCL SMK CPRED,CRES,CWRES,CIPRED,CIRES,CIWRES,CIPREDI,CIRESI,CIWRESI,EPRED,ERES,EWRES,NPDE,NOPRINT ONEHEADER,file=diagnostics.tab
+#+end_src
+
+~print()~ outputs the generated "nmodel" object:
+#+begin_src r
+> model <- nmt::nm_model(data, code, tables)
+> print(model)
+$PROB model by nmt - Mon Jun 15 16:51:13 2026
+$INPUT ID TIME DV AMT WT AGE CRCL SMK
+$DATA data.csv
+
+$SUBROUTINE ADVAN2 TRANS2
+$PK
+  CL=THETA(1)*EXP(ETA(1))
+  TVV=THETA(2)
+  V=TVV*EXP(ETA(2))
+  TVKA=THETA(3)
+  KA=TVKA*EXP(ETA(3))
+  S2=V
+$ERROR
+   DEL=0
+   IF(F.EQ.0) DEL=1
+   W1=1
+   W2=F
+   IPRE=F
+   IRES=DV-IPRE
+   IWRES=IRES/(W1+W2)
+   Y=F + W1*ERR(1) + W2*ERR(2)
+$THETA
+  (0, 10)  ;[CL]
+  (0, 100) ;[V]
+  (0, 0.5) ;[KA]
+$OMEGA
+  0.04 ;[P]
+  0.04 ;[P]
+  0.04 ;[P]
+$SIGMA
+  0.02;[P]
+  0.2 ;[A]
+$EST METHOD=COND INTERACTION MAXEVAL=9999 NOABORT
+$COV
+
+$TABLE ID TIME DV AMT WT AGE CRCL SMK CPRED,CRES,CWRES,CIPRED,CIRES,CIWRES,CIPREDI,CIRESI,CIWRESI,EPRED,ERES,EWRES,NPDE,NOPRINT ONEHEADER,file=diagnostics.tab
+$TABLE ID TIME IPRE ONEHEADER file=table1.tab
+$TABLE CL V KA WT AGE CRCL SMK ONEHEADER file=table2.tab
+#+end_src
+
+To fit the ~nmodel~ object, we use the same ~nmt::nm()~ function:
+#+begin_src r
+  fit <- nmt::nm(model)
+#+end_src
+In this case, the current working directory is the build & run directory.
+The control stream will be saved as "model.ctl", and data as "data.csv".
+
+* Examine results
+~nmt::nm()~ returns an ~nmrun~ object. It has the following elements
+#+begin_src r
+> names(fit)
+ [1] "nm"          "file_stem"   "files"       "model"       "tables"      "result_path" "est"         "cov"
+ [9] "coi"         "cor"
+#+end_src
+- ~nm~: NONMEM path;
+- ~file_stem~: model file sans extension, e.g. "my_model.ctl" will
+  have file stem "my_model";
+- ~files~: path of control stream, data, and included (if any) files;
+- ~model~: control stream as a character vector (use ~cat(fit$model)~
+  to print);
+- ~tables~: path to files by ~$TABLE~;
+- ~result_path~: path to the run directory where result files are
+  located;
+- ~est~: MLE of the population parameters;
+- ~cov~: covariance matrix from the .cov file;
+- ~coi~: Fisher information matrix from the .coi file;
+- ~cor~: Correlation matrix from the .cor file.
+
+For example,
+#+begin_src r
+> fit$est
+    THETA1 THETA2   THETA3 SIGMA.1.1. SIGMA.2.1. SIGMA.2.2. OMEGA.1.1. OMEGA.2.1. OMEGA.2.2. OMEGA.3.1. OMEGA.3.2. OMEGA.3.3.
+15 10.3033 82.275 0.420473  0.0118009          0   0.015101   0.324373          0    0.12803          0          0 0.00987795
+         OBJ
+15 -6.157472
+#+end_src
+
+In addition function ~ext~ and ~phi~ outputs the raw parameter estimates from the
+.ext and .phi file, respectively.
