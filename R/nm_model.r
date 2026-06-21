@@ -8,7 +8,7 @@
 #' @export
 write_nm_csv <- function(data, file) {
     x <- data
-    names(x)[1] <- paste0("# ", names(x)[1])
+    colnames(x)[1] <- paste0("# ", colnames(x)[1])
     write.csv(x, file, na=".", quote=FALSE, row.names=FALSE)
 }
 

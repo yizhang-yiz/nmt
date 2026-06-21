@@ -79,10 +79,10 @@ nm_file <- function(raw_model_path, cmake_stdout) {
                    model=paste(readLines(file.path(f), warn = FALSE), collapse="\n"),
                    tables=tables,
                    result_path=model_dir,
-                   est=est(file.path(fit$result_path, paste0(fit$file_stem, ".ext"))),
-                   cov=res_read_table(file.path(fit$result_path, paste0(fit$file_stem, ".cov"))),
-                   coi=res_read_table(file.path(fit$result_path, paste0(fit$file_stem, ".coi"))),
-                   cor=res_read_table(file.path(fit$result_path, paste0(fit$file_stem, ".cor")))),
+                   est=est(file.path(model_dir, paste0(f0, ".ext"))),
+                   cov=res_read_table(file.path(model_dir, paste0(f0, ".cov"))),
+                   coi=res_read_table(file.path(model_dir, paste0(f0, ".coi"))),
+                   cor=res_read_table(file.path(model_dir, paste0(f0, ".cor")))),
                    class = "nmrun")
 }
 
