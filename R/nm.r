@@ -73,6 +73,9 @@ nm_file <- function(raw_model_path, cmake_stdout) {
     setwd(model_dir)
     res <- sys::exec_wait(cmd=mod, args = c(file.path(f), paste0("-licfile=", .nm_env$nm_lic)))
 
+    file.cov <- file.path(model_dir, paste0(f0, ".cov"))
+    file.coi <- file.path(model_dir, paste0(f0, ".coi"))
+    file.cor <- file.path(model_dir, paste0(f0, ".cor"))
     structure(list(nm=.nm_env$nm_path,
                    file_stem=f0,
                    files=files,
@@ -80,9 +83,10 @@ nm_file <- function(raw_model_path, cmake_stdout) {
                    tables=tables,
                    result_path=model_dir,
                    est=est(file.path(model_dir, paste0(f0, ".ext"))),
-                   cov=res_read_table(file.path(model_dir, paste0(f0, ".cov"))),
-                   coi=res_read_table(file.path(model_dir, paste0(f0, ".coi"))),
-                   cor=res_read_table(file.path(model_dir, paste0(f0, ".cor")))),
+                   diagnostics=read.table(file.path(model_dir, "diagnostics.tab"), header=TRUE, skip=1),
+                   cov=if (file.exists(file.cov)) res_read_table(file.cov) else NULL,
+                   coi=if (file.exists(file.coi)) res_read_table(file.coi) else NULL,
+                   cor=if (file.exists(file.cor)) res_read_table(file.cor) else NULL),
                    class = "nmrun")
 }
 
