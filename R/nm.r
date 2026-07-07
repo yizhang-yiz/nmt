@@ -101,10 +101,14 @@ res_read_table <- function(file) {
 #' @description Raw summary from the ".ext" file
 #'
 #' @export
-raw_summary <- function(fit) {
-    df <- read.table(paste0(tools::file_path_sans_ext(fit$files[1]), ".ext"), header=TRUE, skip=1)
-    df <- df[df$ITERATION<0, ]
-    df
+raw_summary <- function(file) {
+    if (file.size(file) == 0L) {
+        return(NULL)
+    } else {
+        df <- read.table(file, header=TRUE, skip=1)
+        df <- df[df$ITERATION<0, ]
+        return(df)
+    }
 }
 
 #' read .phi file from nmrun object.
@@ -112,7 +116,12 @@ raw_summary <- function(fit) {
 #'
 #' @export
 phi <- function(fit, summary=FALSE) {
-    read.table(paste0(tools::file_path_sans_ext(fit$files[1]), ".phi"), header=TRUE, skip=1)
+    file <- paste0(tools::file_path_sans_ext(fit$files[1]), ".phi")
+    if (file.size(file) == 0L) {
+        return(NULL)
+    } else {
+        return(read.table(file, header=TRUE, skip=1))
+    }
 }
 
 nm_save <- function(fit, to) {
