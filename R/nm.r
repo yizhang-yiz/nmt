@@ -82,7 +82,7 @@ nm_file <- function(raw_model_path, cmake_stdout) {
                    model=paste(readLines(file.path(f), warn = FALSE), collapse="\n"),
                    tables=tables,
                    result_path=model_dir,
-                   est=est(file.path(model_dir, paste0(f0, ".ext"))),
+                   par=raw_summary(file.path(model_dir, paste0(f0, ".ext"))),
                    diagnostics=read.table(file.path(model_dir, "diagnostics.tab"), header=TRUE, skip=1),
                    cov=if (file.exists(file.cov)) res_read_table(file.cov) else NULL,
                    coi=if (file.exists(file.coi)) res_read_table(file.coi) else NULL,
@@ -97,26 +97,13 @@ res_read_table <- function(file) {
     return(df)
 }
 
-#' read .ext file from nmrun object.
-#' @description Raw output from the ".ext" file
+#' read summary in .ext file from nmrun object.
+#' @description Raw summary from the ".ext" file
 #'
 #' @export
-ext <- function(fit, summary=FALSE) {
+raw_summary <- function(fit) {
     df <- read.table(paste0(tools::file_path_sans_ext(fit$files[1]), ".ext"), header=TRUE, skip=1)
-    if(!summary) {
-        df <- df[df$ITERATION>=0, ]
-    }
-    df
-}
-
-#' Retrive final estimates from the .ext file from nmrun object
-#'
-#' @export
-est <- function(file) {
-    df <- read.table(file, header=TRUE, skip=1)
-    df <- df[df$ITERATION>=0, ]
-    df <- tail(df, 1)
-    df$ITERATION <- NULL
+    df <- df[df$ITERATION<0, ]
     df
 }
 
