@@ -4,12 +4,14 @@
 \alias{nm}
 \title{Run the model either from file or "nmodel" object}
 \usage{
-nm(model, cmake_stdout = FALSE)
+nm(model, new_builddir = FALSE, stdout = FALSE)
 }
 \arguments{
 \item{model}{model control stream file or "nmodel" object}
 
-\item{cmake_stdout}{Whether to output cmake build info to screen}
+\item{new_builddir}{Whether to use new tempdir as build dir}
+
+\item{stdout}{Whether to output cmake build info to screen}
 }
 \value{
 nmrun object

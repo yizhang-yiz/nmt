@@ -18,12 +18,12 @@ set_nm_lic <- function(p) {
 
 #' Set NONMEM & lic path
 #'
-#' @param p1 NONMEM directory path
-#' @param p2 NONMEM license path
+#' @param nm_path NONMEM directory path
+#' @param nm_lic NONMEM license path
 #'
 #' @return Normalized path to NONMEM license directory
 #' @export
-set_nm <- function(p1, p2) {
-    set_nm_path(p1)
-    set_nm_lic(p2)
+set_nm <- function(nm_path, nm_lic) {
+    set_nm_path(nm_path)
+    set_nm_lic(nm_lic)
 }

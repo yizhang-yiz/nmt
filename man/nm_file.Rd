@@ -4,7 +4,7 @@
 \alias{nm_file}
 \title{Run NONMEM model specified in a file}
 \usage{
-nm_file(raw_model_path, cmake_stdout)
+nm_file(raw_model_path, new_builddir, cmake_stdout)
 }
 \arguments{
 \item{raw_model_path}{model control stream file path}

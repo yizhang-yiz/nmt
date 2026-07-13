@@ -1,16 +1,17 @@
 #' Run the model either from file or "nmodel" object
 #'
 #' @param model model control stream file or "nmodel" object
-#' @param cmake_stdout Whether to output cmake build info to screen
+#' @param new_builddir Whether to use new tempdir as build dir
+#' @param stdout Whether to output cmake build info to screen
 #' @return nmrun object
 #' @export
-nm <- function(model, cmake_stdout=FALSE) {
+nm <- function(model, new_builddir=FALSE, stdout=FALSE) {
     if (is.character(model)) {
-        nm_file(model, cmake_stdout)
+        nm_file(model, new_builddir, stdout)
     } else if (inherits(model, "nmodel")) {
         write_nm_csv(model$data, "data.csv")
         write(model$control, "./model.ctl")
-        nm_file("./model.ctl", cmake_stdout)
+        nm_file("./model.ctl", new_builddir, stdout)
     }
 }
 
@@ -23,13 +24,13 @@ nm <- function(model, cmake_stdout=FALSE) {
 #' @param cmake_stdout Whether to output cmake build info to screen
 #' @return nmrun object
 #' @export
-nm_file <- function(raw_model_path, cmake_stdout) {
+nm_file <- function(raw_model_path, new_builddir, cmake_stdout) {
     old <- getwd()
     on.exit(setwd(old), add = TRUE)
 
     f <- basename(raw_model_path)
     f0 <- tools::file_path_sans_ext(f)
-    build_dir <- tempfile(pattern = paste0("cmake_", f0, "_"), tmpdir = tempdir())
+    build_dir <- ifelse(new_builddir, tempfile(pattern = paste0("cmake_", f0, "_")), paste0("cmake_", f0))
     dir.create(build_dir, showWarnings = FALSE, recursive = TRUE)
     model_file_path <- normalizePath(raw_model_path)
     model_dir <- normalizePath(dirname(raw_model_path))
@@ -44,24 +45,26 @@ nm_file <- function(raw_model_path, cmake_stdout) {
     if (is.null(.nm_env$nm_lic)) {
         stop("Use 'set_nm_lic()' to set NONMEM license path.")
     }
-    setwd(build_dir)
+
+    print(paste0("-- building dir: ", build_dir))
+
     res <- sys::exec_wait("cmake",
-                          args = c(.nm_env$nm_path, "-B", ".",
+                          args = c(.nm_env$nm_path, "-B", build_dir,
                                    paste0("-Dmodel=", model_file_path),
                                    "-GNinja", .nm_env$cmake_config))
     if (res != 0) stop(sprintf("cmake config failed with exit code %d", res))
 
     if (cmake_stdout) {
         res <- sys::exec_wait("cmake",
-                              args = c("--build", ".", .nm_env$cmake_build))
+                              args = c("--build", build_dir, .nm_env$cmake_build))
     } else {
         res <- sys::exec_wait("cmake",
-                              args = c("--build", ".", .nm_env$cmake_build), std_out=NULL)
+                              args = c("--build", build_dir, .nm_env$cmake_build), std_out=NULL)
     }
 
     if (res != 0) stop(sprintf("cmake build failed with exit code %d", res))
 
-    res <- sys::exec_wait("cmake", args=c("--install", "."))
+    res <- sys::exec_wait("cmake", args=c("--install", build_dir))
     if (res != 0) stop(sprintf("cmake install failed with exit code %d", res))
 
     if (.Platform$OS.type == "windows") {
@@ -76,6 +79,7 @@ nm_file <- function(raw_model_path, cmake_stdout) {
     file.cov <- file.path(model_dir, paste0(f0, ".cov"))
     file.coi <- file.path(model_dir, paste0(f0, ".coi"))
     file.cor <- file.path(model_dir, paste0(f0, ".cor"))
+    file.diagnostics <- file.path(model_dir, "diagnostics.tab")
     structure(list(nm=.nm_env$nm_path,
                    file_stem=f0,
                    files=files,
@@ -83,7 +87,7 @@ nm_file <- function(raw_model_path, cmake_stdout) {
                    tables=tables,
                    result_path=model_dir,
                    par=raw_summary(file.path(model_dir, paste0(f0, ".ext"))),
-                   diagnostics=read.table(file.path(model_dir, "diagnostics.tab"), header=TRUE, skip=1),
+                   diagnostics=if (file.exists(file.diagnostics)) read.table(file.diagnostics, header=TRUE, skip=1) else NULL,
                    cov=if (file.exists(file.cov)) res_read_table(file.cov) else NULL,
                    coi=if (file.exists(file.coi)) res_read_table(file.coi) else NULL,
                    cor=if (file.exists(file.cor)) res_read_table(file.cor) else NULL),

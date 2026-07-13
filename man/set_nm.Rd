@@ -4,12 +4,12 @@
 \alias{set_nm}
 \title{Set NONMEM & lic path}
 \usage{
-set_nm(p1, p2)
+set_nm(nm_path, nm_lic)
 }
 \arguments{
-\item{p1}{NONMEM directory path}
+\item{nm_path}{NONMEM directory path}
 
-\item{p2}{NONMEM license path}
+\item{nm_lic}{NONMEM license path}
 }
 \value{
 Normalized path to NONMEM license directory

@@ -4,7 +4,7 @@
 \alias{raw_summary}
 \title{read summary in .ext file from nmrun object.}
 \usage{
-raw_summary(fit)
+raw_summary(file)
 }
 \description{
 Raw summary from the ".ext" file
