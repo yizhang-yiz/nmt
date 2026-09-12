@@ -4,12 +4,14 @@
 \alias{nm_file}
 \title{Run NONMEM model specified in a file}
 \usage{
-nm_file(raw_model_path, new_builddir, cmake_stdout)
+nm_file(raw_model_path, new_builddir, quiet)
 }
 \arguments{
 \item{raw_model_path}{model control stream file path}
 
-\item{cmake_stdout}{Whether to output cmake build info to screen}
+\item{new_builddir}{Whether to build in a new temp dir managed by R}
+
+\item{quiet}{Whether to output cmake build info to screen}
 }
 \value{
 nmrun object

@@ -2,16 +2,16 @@
 #'
 #' @param model model control stream file or "nmodel" object
 #' @param new_builddir Whether to use new tempdir as build dir
-#' @param stdout Whether to output cmake build info to screen
+#' @param quiet Whether to output cmake build info to screen
 #' @return nmrun object
 #' @export
-nm <- function(model, new_builddir=FALSE, stdout=FALSE) {
+nm <- function(model, new_builddir=FALSE, quiet=TRUE) {
     if (is.character(model)) {
-        nm_file(model, new_builddir, stdout)
+        nm_file(model, new_builddir, quiet)
     } else if (inherits(model, "nmodel")) {
         write_nm_csv(model$data, "data.csv")
-        write(model$control, "./model.ctl")
-        nm_file("./model.ctl", new_builddir, stdout)
+        write(model$control, file="model.ctl")
+        nm_file("model.ctl", new_builddir, quiet)
     }
 }
 
@@ -21,10 +21,11 @@ nm <- function(model, new_builddir=FALSE, stdout=FALSE) {
 #' the data file is located in the same path as the control stream.
 #'
 #' @param raw_model_path model control stream file path
-#' @param cmake_stdout Whether to output cmake build info to screen
+#' @param new_builddir Whether to build in a new temp dir managed by R
+#' @param quiet Whether to output cmake build info to screen
 #' @return nmrun object
 #' @export
-nm_file <- function(raw_model_path, new_builddir, cmake_stdout) {
+nm_file <- function(raw_model_path, new_builddir, quiet) {
     old <- getwd()
     on.exit(setwd(old), add = TRUE)
 
@@ -54,7 +55,7 @@ nm_file <- function(raw_model_path, new_builddir, cmake_stdout) {
                                    "-GNinja", .nm_env$cmake_config))
     if (res != 0) stop(sprintf("cmake config failed with exit code %d", res))
 
-    if (cmake_stdout) {
+    if (!quiet) {
         res <- sys::exec_wait("cmake",
                               args = c("--build", build_dir, .nm_env$cmake_build))
     } else {
@@ -62,6 +63,7 @@ nm_file <- function(raw_model_path, new_builddir, cmake_stdout) {
                               args = c("--build", build_dir, .nm_env$cmake_build), std_out=NULL)
     }
 
+    writeLines(readLines(file.path(model_dir, "FMSG")))
     if (res != 0) stop(sprintf("cmake build failed with exit code %d", res))
 
     res <- sys::exec_wait("cmake", args=c("--install", build_dir))
@@ -77,66 +79,16 @@ nm_file <- function(raw_model_path, new_builddir, cmake_stdout) {
     res <- sys::exec_wait(cmd=mod, args = c(file.path(f), paste0("-licfile=", .nm_env$nm_lic)))
 
     file.cov <- file.path(model_dir, paste0(f0, ".cov"))
-    file.coi <- file.path(model_dir, paste0(f0, ".coi"))
-    file.cor <- file.path(model_dir, paste0(f0, ".cor"))
     file.diagnostics <- file.path(model_dir, "diagnostics.tab")
     structure(list(nm=.nm_env$nm_path,
                    file_stem=f0,
                    files=files,
-                   model=paste(readLines(file.path(f), warn = FALSE), collapse="\n"),
+                   model=structure(list(data=NULL,
+                                        control=paste(readLines(file.path(f), warn = FALSE),
+                                                      collapse="\n")), class="nmodel"),
                    tables=tables,
                    result_path=model_dir,
-                   par=raw_summary(file.path(model_dir, paste0(f0, ".ext"))),
                    diagnostics=if (file.exists(file.diagnostics)) read.table(file.diagnostics, header=TRUE, skip=1) else NULL,
-                   cov=if (file.exists(file.cov)) res_read_table(file.cov) else NULL,
-                   coi=if (file.exists(file.coi)) res_read_table(file.coi) else NULL,
-                   cor=if (file.exists(file.cor)) res_read_table(file.cor) else NULL),
+                   cov=read_nm_table(file.cov) ),
                    class = "nmrun")
-}
-
-res_read_table <- function(file) {
-    df <- read.table(file, header=TRUE, skip=1)
-    df <- df[,2:ncol(df)]
-    rownames(df) <- colnames(df)
-    return(df)
-}
-
-#' read summary in .ext file from nmrun object.
-#' @description Raw summary from the ".ext" file
-#'
-#' @export
-raw_summary <- function(file) {
-    if (file.size(file) == 0L) {
-        return(NULL)
-    } else {
-        df <- read.table(file, header=TRUE, skip=1)
-        df <- df[df$ITERATION<0, ]
-        return(df)
-    }
-}
-
-#' read .phi file from nmrun object.
-#' @description Raw individual estimate from the ".phi" file
-#'
-#' @export
-phi <- function(fit, summary=FALSE) {
-    file <- paste0(tools::file_path_sans_ext(fit$files[1]), ".phi")
-    if (file.size(file) == 0L) {
-        return(NULL)
-    } else {
-        return(read.table(file, header=TRUE, skip=1))
-    }
-}
-
-nm_save <- function(fit, to) {
-    if(inherits(fit, "nmrun")) {
-        f0 <- tools::file_path_sans_ext(basename(fit$files[1]))
-        if (!dir.exists(to)) dir.create(to, recursive = TRUE)
-        f <- list.files(fit$result_path, full.names=TRUE)
-        f <- f[!grepl("\\.cmake$|\\.tmp$|\\.trash$|\\.bak$|\\.a$|build\\.ninja|modules$|fort\\.[0-9]+$|CMake", f)]
-        f <- f[!grepl(paste0(f0,"$"), f)]
-        f <- f[!grepl(paste0(f0,".exe$"), f)]
-        print("x")
-        file.copy(f, to, overwrite=TRUE, copy.date=TRUE)
-    }
 }

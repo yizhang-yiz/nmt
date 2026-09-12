@@ -1,17 +1,3 @@
-#' Write a data.frame to .csv compatible with NONMEM format
-#' One can use R's read.csv to read a NONMEM .csv file:
-#'
-#' read.csv(file, comment.char = ignore, na.strings = ".")
-#'
-#' @param data data object to be saved
-#' @param file .csv file path
-#' @export
-write_nm_csv <- function(data, file) {
-    x <- data
-    colnames(x)[1] <- paste0("# ", colnames(x)[1])
-    write.csv(x, file, na=".", quote=FALSE, row.names=FALSE)
-}
-
 #' Create an "nmodel" object based on given data and code.
 #'
 #' @param data data object for the model. It must contain necessary
