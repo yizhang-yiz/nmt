@@ -4,12 +4,12 @@
 \alias{nm}
 \title{Run the model either from file or "nmodel" object}
 \usage{
-nm(model, new_builddir = FALSE, quiet = TRUE)
+nm(model, rebuild = FALSE, quiet = TRUE)
 }
 \arguments{
 \item{model}{model control stream file or "nmodel" object}
 
-\item{new_builddir}{Whether to use new tempdir as build dir}
+\item{rebuild}{Whether to use new tempdir as build dir}
 
 \item{quiet}{Whether to output cmake build info to screen}
 }

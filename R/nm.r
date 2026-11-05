@@ -1,17 +1,17 @@
 #' Run the model either from file or "nmodel" object
 #'
 #' @param model model control stream file or "nmodel" object
-#' @param new_builddir Whether to use new tempdir as build dir
+#' @param rebuild Whether to use new tempdir as build dir
 #' @param quiet Whether to output cmake build info to screen
 #' @return nmrun object
 #' @export
-nm <- function(model, new_builddir=FALSE, quiet=TRUE) {
+nm <- function(model, rebuild=FALSE, quiet=TRUE) {
     if (is.character(model)) {
-        nm_file(model, new_builddir, quiet)
+        nm_file(model, rebuild, quiet)
     } else if (inherits(model, "nmodel")) {
         write_nm_csv(model$data, "data.csv")
         write(model$control, file="model.ctl")
-        nm_file("model.ctl", new_builddir, quiet)
+        nm_file("model.ctl", rebuild, quiet)
     }
 }
 
@@ -21,17 +21,17 @@ nm <- function(model, new_builddir=FALSE, quiet=TRUE) {
 #' the data file is located in the same path as the control stream.
 #'
 #' @param raw_model_path model control stream file path
-#' @param new_builddir Whether to build in a new temp dir managed by R
+#' @param rebuild Whether to build in a new temp dir managed by R
 #' @param quiet Whether to output cmake build info to screen
 #' @return nmrun object
 #' @export
-nm_file <- function(raw_model_path, new_builddir, quiet) {
+nm_file <- function(raw_model_path, rebuild, quiet) {
     old <- getwd()
     on.exit(setwd(old), add = TRUE)
 
     f <- basename(raw_model_path)
     f0 <- tools::file_path_sans_ext(f)
-    build_dir <- ifelse(new_builddir, tempfile(pattern = paste0("cmake_", f0, "_")), paste0("cmake_", f0))
+    build_dir <- ifelse(rebuild, tempfile(pattern = paste0("cmake_", f0, "_")), paste0("cmake_", f0))
     dir.create(build_dir, showWarnings = FALSE, recursive = TRUE)
     model_file_path <- normalizePath(raw_model_path)
     model_dir <- normalizePath(dirname(raw_model_path))
@@ -81,6 +81,7 @@ nm_file <- function(raw_model_path, new_builddir, quiet) {
     file.cov <- file.path(model_dir, paste0(f0, ".cov"))
     file.diagnostics <- file.path(model_dir, "diagnostics.tab")
     structure(list(nm=.nm_env$nm_path,
+                   build_dir=build_dir,
                    file_stem=f0,
                    files=files,
                    model=structure(list(data=NULL,
